@@ -182,6 +182,14 @@ async def create_character(
             }
             db_character.char_metadata = updated_metadata
             print(f"[Characters API] [OK] char_metadata populated with {len(updated_metadata)} fields")
+        else:
+            # No traits extracted, use basic metadata
+            updated_metadata = {
+                "reference_images": image_urls,
+                "faces_detected": extraction_result.get("faces_detected", 0),
+                "quality_score": extraction_result.get("quality_score", 0.0),
+            }
+            db_character.char_metadata = updated_metadata
         
         db.commit()
         db.refresh(db_character)
@@ -223,19 +231,27 @@ CRITICAL INSTRUCTIONS:
                 canonical_path = f"characters/{character_id}/canonical.jpg"
                 canonical_url = await storage.upload_bytes(canonical_bytes, canonical_path)
                 
-                # Update the base_image_url to point to canonical image
+                # ============================================================
+                # CRITICAL: Update the base_image_url to canonical image
+                # ============================================================
                 db_character.base_image_url = canonical_url
+                print(f"[Characters API] base_image_url updated: {db_character.base_image_url}")
                 
                 # Update metadata to track both original and canonical
-                updated_metadata["original_reference"] = image_urls[0]
-                updated_metadata["canonical_image"] = canonical_url
-                updated_metadata["description_applied"] = True
-                db_character.char_metadata = updated_metadata
+                current_metadata = db_character.char_metadata or {}
+                current_metadata["original_reference"] = image_urls[0]
+                current_metadata["canonical_image"] = canonical_url
+                current_metadata["description_applied"] = True
+                current_metadata["applied_description"] = description
+                db_character.char_metadata = current_metadata
                 
+                # Commit the changes
                 db.commit()
                 db.refresh(db_character)
                 
+                # Verify the update
                 print(f"[Characters API] [OK] Canonical image generated: {canonical_url}")
+                print(f"[Characters API] [OK] base_image_url after commit: {db_character.base_image_url}")
                 print(f"[Characters API] Future generations will use the canonical image (with {description})")
                 
             except Exception as gen_err:
