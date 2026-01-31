@@ -3,8 +3,114 @@ Groq LLM Service
 Uses Groq (free tier) for prompt generation, summarization, and text processing.
 """
 
+import re
 from groq import Groq
 from app.core.config import settings
+
+
+# Distance mapping: real-world measurements to standardized camera distances
+DISTANCE_MAP = {
+    # Metric (meters)
+    (0, 0.5): "extreme-close-up",
+    (0.5, 1.0): "close-up",
+    (1.0, 1.5): "medium-close",
+    (1.5, 2.5): "medium",
+    (2.5, 4.0): "medium-long",
+    (4.0, 10.0): "long-shot",
+    (10.0, float('inf')): "extreme-long",
+}
+
+# Camera angle keywords mapping
+ANGLE_KEYWORDS = {
+    "from above": "high-angle",
+    "from below": "low-angle",
+    "looking up": "low-angle",
+    "looking down": "high-angle",
+    "bird's eye": "birds-eye",
+    "birds eye": "birds-eye",
+    "aerial": "birds-eye",
+    "overhead": "birds-eye",
+    "ground level": "worms-eye",
+    "worm's eye": "worms-eye",
+    "worms eye": "worms-eye",
+    "tilted": "dutch-angle",
+    "dutch": "dutch-angle",
+    "canted": "dutch-angle",
+    "over shoulder": "over-the-shoulder",
+    "over the shoulder": "over-the-shoulder",
+    "ots": "over-the-shoulder",
+    "pov": "pov",
+    "first person": "pov",
+    "point of view": "pov",
+    "eye level": "eye-level",
+    "straight on": "eye-level",
+}
+
+
+def parse_distance_from_prompt(prompt: str) -> tuple[str | None, str | None]:
+    """
+    Parse real-world distance measurements from prompt and convert to camera distance.
+    Also detects camera angle keywords.
+    
+    Returns: (camera_distance, camera_angle) or (None, None) if not found
+    """
+    prompt_lower = prompt.lower()
+    
+    # Parse distance measurements
+    camera_distance = None
+    
+    # Pattern for meters: "1m", "1 m", "1 meter", "1 meters", "1.5m", etc.
+    meter_patterns = [
+        r'(\d+(?:\.\d+)?)\s*(?:m|meter|meters|metre|metres)\b',
+        r'(\d+(?:\.\d+)?)\s*(?:m|meter|meters|metre|metres)\s+(?:away|back|distance)',
+    ]
+    
+    # Pattern for centimeters: "50cm", "50 cm", etc.
+    cm_pattern = r'(\d+(?:\.\d+)?)\s*(?:cm|centimeter|centimeters|centimetre|centimetres)\b'
+    
+    # Pattern for feet: "3ft", "3 feet", "3 foot", etc.
+    feet_pattern = r'(\d+(?:\.\d+)?)\s*(?:ft|feet|foot)\b'
+    
+    # Try to extract distance in meters
+    for pattern in meter_patterns:
+        match = re.search(pattern, prompt_lower)
+        if match:
+            distance_m = float(match.group(1))
+            camera_distance = _meters_to_camera_distance(distance_m)
+            break
+    
+    # Try centimeters if no meters found
+    if not camera_distance:
+        match = re.search(cm_pattern, prompt_lower)
+        if match:
+            distance_cm = float(match.group(1))
+            distance_m = distance_cm / 100
+            camera_distance = _meters_to_camera_distance(distance_m)
+    
+    # Try feet if nothing else found
+    if not camera_distance:
+        match = re.search(feet_pattern, prompt_lower)
+        if match:
+            distance_ft = float(match.group(1))
+            distance_m = distance_ft * 0.3048  # Convert feet to meters
+            camera_distance = _meters_to_camera_distance(distance_m)
+    
+    # Parse camera angle keywords
+    camera_angle = None
+    for keyword, angle in ANGLE_KEYWORDS.items():
+        if keyword in prompt_lower:
+            camera_angle = angle
+            break
+    
+    return camera_distance, camera_angle
+
+
+def _meters_to_camera_distance(meters: float) -> str:
+    """Convert meters to standardized camera distance."""
+    for (min_dist, max_dist), camera_dist in DISTANCE_MAP.items():
+        if min_dist <= meters < max_dist:
+            return camera_dist
+    return "medium"  # Default fallback
 
 
 class GroqLLMService:
@@ -164,6 +270,19 @@ Return a JSON object with these fields:
             learned_style = " | ".join(style_parts) if style_parts else "Not yet established"
             signature_poses = ", ".join(poses) if poses else "None"
 
+        # Parse real-world distance/angle from user prompt (e.g., "1m away", "from above")
+        parsed_distance, parsed_angle = parse_distance_from_prompt(user_prompt)
+        
+        # Use parsed values if found, otherwise use character's default
+        effective_camera_distance = parsed_distance or character_data.get("camera_distance", "medium")
+        effective_camera_angle = parsed_angle or character_data.get("camera_angle", "eye-level")
+        
+        # Log if we interpreted a distance
+        if parsed_distance:
+            print(f"[Groq] Interpreted distance from prompt: '{user_prompt}' → {parsed_distance}")
+        if parsed_angle:
+            print(f"[Groq] Interpreted angle from prompt: '{user_prompt}' → {parsed_angle}")
+
         # Fill template with all memory context
         filled_prompt = self.PROMPT_TEMPLATE.format(
             name=character_data.get("name", "Unknown Character"),
@@ -181,8 +300,8 @@ Return a JSON object with these fields:
             visible_objects=character_data.get("visible_objects", "Not captured"),
             initial_pose=character_data.get("pose", "Not captured"),
             hand_position=character_data.get("hand_position", "Not captured"),
-            camera_angle=character_data.get("camera_angle", "eye-level"),
-            camera_distance=character_data.get("camera_distance", "medium"),
+            camera_angle=effective_camera_angle,
+            camera_distance=effective_camera_distance,
             subject_facing=character_data.get("subject_facing", "camera"),
             initial_lighting=character_data.get("lighting", "Not captured"),
             color_palette=character_data.get("color_palette", "Not captured"),
