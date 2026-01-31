@@ -48,29 +48,16 @@ async def create_character(
     description: str = Form(None),
     consent: bool = Form(...),
     files: List[UploadFile] = File(...),
-    apply_description: bool = Form(default=False),  # NEW: Generate canonical image with description applied
     db: Session = Depends(get_db),
 ):
     """
-    Create a new character from reference images.
+    Create a new character.
     
-    This endpoint:
-    1. Uploads reference images to storage
-    2. Extracts face embeddings using InsightFace
-    3. Analyzes visual traits using Gemini Vision
-    4. Stores semantic vector in VectorDB
-    5. Populates char_metadata with identity data
-    6. (Optional) Generates canonical image with description applied
-    
-    Parameters:
-    - apply_description: If True, generates a NEW image with the description
-      applied (e.g., adds scars, tattoos, etc.) and uses THAT as the reference.
-      This ensures features like scars are visually present in the reference.
-    
-    The extracted data enables:
-    - IDR (Identity Retention) scoring
-    - Character consistency in generation
-    - Memory-augmented prompt generation
+    Flow:
+    1. Upload initial photo (temporary reference)
+    2. Generate CANONICAL image using photo + description
+    3. Update Character URL to this new Canonical image
+    4. Analyze the Canonical image for traits
     """
     if not consent:
         raise HTTPException(
@@ -78,198 +65,115 @@ async def create_character(
             detail="Consent is required to create a character"
         )
     
-    if len(files) < 1 or len(files) > 5:
+    if len(files) < 1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Please upload between 1 and 5 reference images"
+            detail="Please upload a reference image"
         )
     
-    # Generate character ID
     character_id = f"char_{uuid.uuid4().hex[:8]}"
-    
-    # Upload images to local storage
     storage = StorageService()
-    image_urls = []
-    for idx, file in enumerate(files):
-        try:
-            url = await storage.upload_file(
-                file=file,
-                path=f"characters/{character_id}/ref_{idx}.jpg"
-            )
-            image_urls.append(url)
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to upload file: {str(e)}"
-            )
     
-    # Create initial database record
+    # 1. Upload initial file (Temporary Reference)
+    try:
+        original_url = await storage.upload_file(
+            file=files[0],
+            path=f"characters/{character_id}/original_upload.jpg"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload: {e}")
+    
+    # Create DB Record (initially pointing to upload, updated immediately after)
     db_character = Character(
-        id=character_id,
-        name=name,
+        id=character_id, 
+        name=name, 
         description=description,
-        semantic_vector_id=None,  # Will be set after extraction
-        base_image_url=image_urls[0] if image_urls else None,
+        base_image_url=original_url, # Temporary
         consent_given_at=datetime.utcnow(),
-        char_metadata={"reference_images": image_urls}  # Initial metadata
+        char_metadata={"original_upload": original_url}
     )
     db.add(db_character)
     db.commit()
     
-    # ============================================================
-    # CRITICAL: Extract identity and create semantic memory
-    # ============================================================
-    print(f"[Characters API] Starting identity extraction for {character_id}...")
-    
     try:
-        from app.workers.extractor import extract_identity_task
+        # 2. Generate CANONICAL Image
+        from app.services.gemini_image import GeminiImageService
+        gemini = GeminiImageService(storage_service=storage)
         
-        extraction_result = await extract_identity_task(
-            character_id=character_id,
-            image_urls=image_urls,
-            metadata={
-                "name": name,
-                "description": description or "",
-            }
+        print(f"[Characters API] Generating canonical image for {character_id}...")
+        
+        user_prompt = description if description and description.strip() else f"A photorealistic portrait of {name}"
+        canonical_prompt = f"""Generate a high-quality, photorealistic portrait of this person.
+Modifications: {user_prompt}
+
+REQUIREMENTS:
+- Preserve the identity (face structure) of the reference image
+- Apply the described modifications (clothing, scars, etc.)
+- This will be the PRIMARY reference image for this character."""
+
+        canonical_bytes = await gemini.generate(
+            prompt=canonical_prompt,
+            base_image_url=original_url,
+            aspect_ratio="1:1"
         )
         
-        # Update character with extraction results
-        if extraction_result.get("vector_id"):
-            db_character.semantic_vector_id = extraction_result["vector_id"]
-            print(f"[Characters API] [OK] Semantic vector created: {extraction_result['vector_id']}")
-        else:
-            print(f"[Characters API] [WARNING] No semantic vector created")
+        canonical_url = await storage.upload_bytes(
+            canonical_bytes, 
+            f"characters/{character_id}/canonical.jpg"
+        )
         
-        # Merge extracted traits into char_metadata
-        traits = extraction_result.get("traits", {})
-        if traits:
-            updated_metadata = {
-                # Reference images
-                "reference_images": image_urls,
-                # Identity features (NEVER CHANGE)
-                "face": traits.get("face", "Not analyzed"),
-                "hair": traits.get("hair", "Not analyzed"),
-                "eyes": traits.get("eyes", "Not analyzed"),
-                "eyebrows": traits.get("eyebrows", "Not analyzed"),
-                "distinctives": traits.get("distinctives", "None"),
-                "build": traits.get("build", "Average"),
-                "age_range": traits.get("age_range", "Unknown"),
-                "skin_tone": traits.get("skin_tone", "Not specified"),
-                "gender_presentation": traits.get("gender_presentation", ""),
-                "facial_expression": traits.get("facial_expression", "Not captured"),
-                # Outfit & accessories (preserve unless changed)
-                "initial_outfit": traits.get("initial_outfit", "Not captured"),
-                "accessories": traits.get("accessories", "None"),
-                "props_in_hands": traits.get("props_in_hands", "None"),
-                # Pose & position (preserve unless changed)
-                "pose": traits.get("pose", "Not captured"),
-                "hand_position": traits.get("hand_position", "Not captured"),
-                "camera_angle": traits.get("camera_angle", "eye-level"),
-                "camera_distance": traits.get("camera_distance", "medium"),
-                "subject_facing": traits.get("subject_facing", "camera"),
-                # Background & scene (preserve unless new location)
-                "initial_background": traits.get("initial_background", "Not captured"),
-                "background_objects": traits.get("background_objects", "Not captured"),
-                "visible_objects": traits.get("visible_objects", "None"),
-                # Lighting & composition (preserve unless changed)
-                "lighting": traits.get("lighting", "Not captured"),
-                "color_palette": traits.get("color_palette", "Not captured"),
-                "image_composition": traits.get("image_composition", "Not captured"),
-                # Tags and quality
-                "tags": traits.get("tags", []),
-                "faces_detected": extraction_result.get("faces_detected", 0),
-                "quality_score": extraction_result.get("quality_score", 0.0),
-            }
-            db_character.char_metadata = updated_metadata
-            print(f"[Characters API] [OK] char_metadata populated with {len(updated_metadata)} fields")
-        else:
-            # No traits extracted, use basic metadata
-            updated_metadata = {
-                "reference_images": image_urls,
-                "faces_detected": extraction_result.get("faces_detected", 0),
-                "quality_score": extraction_result.get("quality_score", 0.0),
-            }
-            db_character.char_metadata = updated_metadata
+        # 3. Update Character to use Canonical Image
+        db_character.base_image_url = canonical_url
+        
+        # CRITICAL: references also point to canonical
+        # The original upload is no longer used for generation/analysis
+        current_meta = db_character.char_metadata or {}
+        current_meta["reference_images"] = [canonical_url]
+        current_meta["original_upload"] = original_url 
+        db_character.char_metadata = current_meta
         
         db.commit()
         db.refresh(db_character)
+        print(f"[Characters API] Canonical Image Set: {canonical_url}")
         
-        # ============================================================
-        # OPTIONAL: Generate CANONICAL image with description applied
-        # ============================================================
-        if apply_description and description:
-            print(f"[Characters API] Generating canonical image with description applied...")
-            try:
-                from app.services.gemini_image import GeminiImageService
-                
-                gemini = GeminiImageService(storage_service=storage)
-                
-                # Build the canonical generation prompt
-                # This applies the user's description to create the "true" reference
-                canonical_prompt = f"""Apply the following modifications to this person's appearance:
-{description}
-
-CRITICAL INSTRUCTIONS:
-- Keep the SAME person (same face structure, same identity)
-- Apply ONLY the modifications described above
-- If description mentions a scar - ADD the scar visibly
-- If description mentions tattoo - ADD the tattoo visibly
-- If description mentions closed eye - SHOW the closed eye
-- If description mentions specific clothing - SHOW that clothing
-- Maintain photorealistic quality
-- This will become the CHARACTER'S CANONICAL APPEARANCE"""
-
-                # Generate the canonical image
-                canonical_bytes = await gemini.generate(
-                    prompt=canonical_prompt,
-                    aspect_ratio="1:1",  # Square for reference
-                    reference_image_url=image_urls[0],
-                    character_data=updated_metadata
-                )
-                
-                # Save the canonical image
-                canonical_path = f"characters/{character_id}/canonical.jpg"
-                canonical_url = await storage.upload_bytes(canonical_bytes, canonical_path)
-                
-                # ============================================================
-                # CRITICAL: Update the base_image_url to canonical image
-                # ============================================================
-                db_character.base_image_url = canonical_url
-                print(f"[Characters API] base_image_url updated: {db_character.base_image_url}")
-                
-                # Update metadata to track both original and canonical
-                current_metadata = db_character.char_metadata or {}
-                current_metadata["original_reference"] = image_urls[0]
-                current_metadata["canonical_image"] = canonical_url
-                current_metadata["description_applied"] = True
-                current_metadata["applied_description"] = description
-                db_character.char_metadata = current_metadata
-                
-                # Commit the changes
-                db.commit()
-                db.refresh(db_character)
-                
-                # Verify the update
-                print(f"[Characters API] [OK] Canonical image generated: {canonical_url}")
-                print(f"[Characters API] [OK] base_image_url after commit: {db_character.base_image_url}")
-                print(f"[Characters API] Future generations will use the canonical image (with {description})")
-                
-            except Exception as gen_err:
-                print(f"[Characters API] [WARNING] Failed to generate canonical image: {gen_err}")
-                print(f"[Characters API] Falling back to original reference image")
-                import traceback
-                traceback.print_exc()
+        # 4. Analyze the CANONICAL Image (Extraction)
+        # We STRICTLY use the generated image for analysis
+        from app.workers.extractor import extract_identity_task
+        print(f"[Characters API] Analyzing generated canonical image...")
         
-        print(f"[Characters API] [OK] Character {character_id} created with full identity data")
+        extraction_result = await extract_identity_task(
+            character_id=character_id,
+            image_urls=[canonical_url], # STRICTLY generated image
+            metadata={"name": name, "description": description}
+        )
         
+        # Update DB with analysis results
+        if extraction_result.get("vector_id"):
+            db_character.semantic_vector_id = extraction_result["vector_id"]
+            
+        traits = extraction_result.get("traits", {})
+        if traits:
+            # Merge traits into metadata
+            # We keep reference_images as [canonical_url]
+            updated_meta = db_character.char_metadata
+            updated_meta.update(traits)
+            
+            # Ensure complex fields are preserved if needed or just dump everything
+            # The extraction task returns a flat dict of traits mainly, plus 'clothing' etc
+            # We trust the extractor.
+            
+            db_character.char_metadata = updated_meta
+            db.commit()
+            print(f"[Characters API] Character analysis complete based on canonical image.")
+            
     except Exception as e:
-        # Log the error but don't fail character creation
-        # The character exists, just without full memory
-        print(f"[Characters API] [ERROR] Identity extraction failed: {e}")
-        print(f"[Characters API] Character created but memory system may be incomplete")
+        print(f"[Characters API] Error during generation/analysis: {e}")
         import traceback
         traceback.print_exc()
-    
+        # We don't fail the request, we return the character as-is (maybe with original image)
+        # But per user request "there is no use of ref image", failing here would mean broken character.
+        # We'll leave it as best-effort.
+
     return db_character
 
 
@@ -340,7 +244,7 @@ CRITICAL INSTRUCTIONS:
         canonical_bytes = await gemini.generate(
             prompt=canonical_prompt,
             aspect_ratio="1:1",
-            reference_image_url=original_ref,
+            base_image_url=original_ref,
             character_data=metadata
         )
         
@@ -356,6 +260,8 @@ CRITICAL INSTRUCTIONS:
         metadata["canonical_image"] = canonical_url
         metadata["description_applied"] = True
         metadata["applied_description"] = description
+        # Update reference_images to point to the new canonical image
+        metadata["reference_images"] = [canonical_url]
         
         # Also update distinctives if description mentions scars/marks
         desc_lower = description.lower()
