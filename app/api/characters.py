@@ -115,7 +115,7 @@ REQUIREMENTS:
         
         # 3. DELETE the temporary uploaded image - we don't need it anymore
         try:
-            await storage.delete_folder(f"characters/{character_id}/temp_upload.jpg")
+            await storage.delete_file(f"characters/{character_id}/temp_upload.jpg")
             print(f"[Characters API] Deleted temporary upload")
         except Exception as delete_err:
             print(f"[Characters API] Warning: Could not delete temp upload: {delete_err}")
@@ -174,7 +174,7 @@ REQUIREMENTS:
         
         # Clean up the temporary upload
         try:
-            await storage.delete_folder(f"characters/{character_id}/temp_upload.jpg")
+            await storage.delete_file(f"characters/{character_id}/temp_upload.jpg")
         except:
             pass
         
@@ -217,12 +217,13 @@ async def apply_description_to_character(
     
     metadata = character.char_metadata or {}
     
-    # Get the original reference image (prefer original over canonical)
-    original_ref = metadata.get("original_reference", character.base_image_url)
+    # ALWAYS use the current canonical image (base_image_url)
+    # Never use old uploaded images even if they exist in metadata
+    original_ref = character.base_image_url
     if not original_ref:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No reference image available"
+            detail="No canonical image available for this character"
         )
     
     storage = StorageService()
@@ -265,7 +266,7 @@ CRITICAL INSTRUCTIONS:
         character.base_image_url = canonical_url
         
         # Update metadata
-        metadata["original_reference"] = original_ref
+        # DON'T store original_reference - only track canonical images
         metadata["canonical_image"] = canonical_url
         metadata["description_applied"] = True
         metadata["applied_description"] = description

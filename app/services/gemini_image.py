@@ -140,11 +140,13 @@ class GeminiImageService:
             
             # Create the prompt with identity instruction if we have reference images
             if ref_image_bytes:
-                # Extract ALL traits to FORCE into the generation - EVERY detail matters
+                # Initialize variables BEFORE conditional blocks to prevent UnboundLocalError
                 traits_prompt = ""
                 identity_confidence = ""
                 mandatory_features = []  # Features that MUST appear in output
+                mandatory_prompt = ""
                 
+                # Extract ALL traits to FORCE into the generation - EVERY detail matters
                 if character_data:
                     # Identity features
                     face = character_data.get("face", "")

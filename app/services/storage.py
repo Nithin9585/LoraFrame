@@ -96,6 +96,33 @@ class StorageService:
         )
         return f"s3://{self.bucket}/{path}"
     
+    async def delete_file(self, path: str):
+        """Delete a single file."""
+        if self.use_gcs:
+            # Delete from GCS - determine correct bucket
+            if path.startswith("uploads/") or path.startswith("characters/"):
+                bucket = self.bucket_uploads
+            else:
+                bucket = self.bucket_outputs
+            blob = bucket.blob(path)
+            try:
+                blob.delete()
+                print(f"[Storage] Deleted file: {path}")
+            except Exception as e:
+                print(f"[Storage] Warning: Could not delete {path}: {e}")
+        elif self.use_local:
+            file_path = self.base_path / path
+            if file_path.exists() and file_path.is_file():
+                file_path.unlink()
+                print(f"[Storage] Deleted file: {path}")
+        else:
+            # S3
+            try:
+                self.s3.delete_object(Bucket=self.bucket, Key=path)
+                print(f"[Storage] Deleted file: {path}")
+            except Exception as e:
+                print(f"[Storage] Warning: Could not delete {path}: {e}")
+    
     async def delete_folder(self, prefix: str):
         """Delete all files with given prefix."""
         if self.use_gcs:
