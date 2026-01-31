@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     CLOUD_SQL_CONNECTION_NAME: str = ""  # Format: PROJECT_ID:REGION:INSTANCE
     
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: List[str] = ["*"]
     
     # Worker settings
     JOB_TIMEOUT_EXTRACTION: int = 60
