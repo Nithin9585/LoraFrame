@@ -207,7 +207,7 @@ Extract the following details in JSON format:
     "camera_angle": "Choose ONE: eye-level | high-angle | low-angle | birds-eye | worms-eye | dutch-angle | over-the-shoulder | pov | oblique",
     "camera_distance": "Choose ONE: extreme-close-up (face only) | close-up (head+shoulders) | medium-close (waist up) | medium (knees up) | medium-long (full body with space) | long-shot (full body, environment visible) | extreme-long (subject small in frame)",
     "subject_facing": "Where subject is looking: camera | left | right | up | down | away",
-    "lighting": "DETAILED lighting (source direction, type, shadows, highlights, color temperature),
+    "lighting": "DETAILED lighting (source direction, type, shadows, highlights, color temperature)",
     "color_palette": "Dominant colors in the entire image (list 5-7 main colors)",
     "image_composition": "How the image is framed (headshot, half-body, full-body, centered, rule of thirds)",
     "tags": ["list", "of", "15-20", "descriptive", "tags", "for", "every", "visual", "element"]

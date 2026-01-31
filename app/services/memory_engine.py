@@ -32,20 +32,38 @@ from app.core.config import settings
 
 @dataclass
 class CharacterSheet:
-    """Canonical character identity sheet."""
+    """Canonical character identity sheet with ALL visual details."""
+    # Identity (NEVER CHANGE)
     name: str
     face_description: str
     hair: str
     eyes: str
+    eyebrows: str
     skin_tone: str
     distinctive_marks: str
     age_range: str
     build: str
+    gender_presentation: str
+    facial_expression: str
+    # Outfit & Items
     initial_outfit: str
-    initial_background: str
-    pose: str
-    lighting: str
     accessories: str
+    props_in_hands: str
+    # Pose & Camera
+    pose: str
+    hand_position: str
+    camera_angle: str
+    camera_distance: str
+    subject_facing: str
+    # Background & Scene
+    initial_background: str
+    background_objects: str
+    visible_objects: str
+    # Lighting & Composition
+    lighting: str
+    color_palette: str
+    image_composition: str
+    # Tags
     semantic_tags: List[str]
     
     def to_prompt_block(self) -> str:
@@ -53,17 +71,38 @@ class CharacterSheet:
         return f"""[CHARACTER_SHEET]
 Name: {self.name}
 Face: {self.face_description}
+Expression: {self.facial_expression}
 Hair: {self.hair}
 Eyes: {self.eyes}
+Eyebrows: {self.eyebrows}
 Skin: {self.skin_tone}
 Distinctives: {self.distinctive_marks}
 Age: {self.age_range}
 Build: {self.build}
-Initial Outfit: {self.initial_outfit}
-Initial Background: {self.initial_background}
-Pose: {self.pose}
-Lighting: {self.lighting}
+Gender: {self.gender_presentation}
+
+[OUTFIT & ITEMS]
+Outfit: {self.initial_outfit}
 Accessories: {self.accessories}
+Holding: {self.props_in_hands}
+
+[POSE & CAMERA]
+Pose: {self.pose}
+Hand Position: {self.hand_position}
+Camera Angle: {self.camera_angle}
+Camera Distance: {self.camera_distance}
+Subject Facing: {self.subject_facing}
+
+[BACKGROUND & SCENE]
+Background: {self.initial_background}
+Background Objects: {self.background_objects}
+Visible Objects: {self.visible_objects}
+
+[LIGHTING & COMPOSITION]
+Lighting: {self.lighting}
+Color Palette: {self.color_palette}
+Composition: {self.image_composition}
+
 Tags: {', '.join(self.semantic_tags)}"""
 
 
@@ -135,15 +174,27 @@ class CharacterMemoryEngine:
             face_description=metadata.get("face", "Not specified"),
             hair=metadata.get("hair", "Not specified"),
             eyes=metadata.get("eyes", "Not specified"),
+            eyebrows=metadata.get("eyebrows", "Not specified"),
             skin_tone=metadata.get("skin_tone", "Not specified"),
             distinctive_marks=metadata.get("distinctives", "None"),
             age_range=metadata.get("age_range", "Unknown"),
             build=metadata.get("build", "Average"),
+            gender_presentation=metadata.get("gender_presentation", "Not specified"),
+            facial_expression=metadata.get("facial_expression", "Not captured"),
             initial_outfit=metadata.get("initial_outfit", "Not captured"),
-            initial_background=metadata.get("initial_background", "Not captured"),
-            pose=metadata.get("pose", "Not captured"),
-            lighting=metadata.get("lighting", "Not captured"),
             accessories=metadata.get("accessories", "None"),
+            props_in_hands=metadata.get("props_in_hands", "None"),
+            pose=metadata.get("pose", "Not captured"),
+            hand_position=metadata.get("hand_position", "Not captured"),
+            camera_angle=metadata.get("camera_angle", "eye-level"),
+            camera_distance=metadata.get("camera_distance", "medium"),
+            subject_facing=metadata.get("subject_facing", "camera"),
+            initial_background=metadata.get("initial_background", "Not captured"),
+            background_objects=metadata.get("background_objects", "Not captured"),
+            visible_objects=metadata.get("visible_objects", "None"),
+            lighting=metadata.get("lighting", "Not captured"),
+            color_palette=metadata.get("color_palette", "Not captured"),
+            image_composition=metadata.get("image_composition", "Not captured"),
             semantic_tags=metadata.get("tags", [])
         )
     
@@ -259,15 +310,41 @@ class CharacterMemoryEngine:
             ep.to_prompt_line() for ep in merged.recent_episodes
         ]) if merged.recent_episodes else "No previous scenes"
         
+        sheet = merged.character_sheet
         return {
-            "name": merged.character_sheet.name,
-            "face": merged.character_sheet.face_description,
-            "hair": merged.character_sheet.hair,
-            "eyes": merged.character_sheet.eyes,
-            "distinctives": merged.character_sheet.distinctive_marks,
-            "age_range": merged.character_sheet.age_range,
-            "build": merged.character_sheet.build,
-            "tags": merged.character_sheet.semantic_tags,
+            # Identity (NEVER CHANGE)
+            "name": sheet.name,
+            "face": sheet.face_description,
+            "hair": sheet.hair,
+            "eyes": sheet.eyes,
+            "eyebrows": sheet.eyebrows,
+            "distinctives": sheet.distinctive_marks,
+            "age_range": sheet.age_range,
+            "build": sheet.build,
+            "skin_tone": sheet.skin_tone,
+            "gender_presentation": sheet.gender_presentation,
+            "facial_expression": sheet.facial_expression,
+            # Outfit & Items
+            "initial_outfit": sheet.initial_outfit,
+            "accessories": sheet.accessories,
+            "props_in_hands": sheet.props_in_hands,
+            # Pose & Camera
+            "pose": sheet.pose,
+            "hand_position": sheet.hand_position,
+            "camera_angle": sheet.camera_angle,
+            "camera_distance": sheet.camera_distance,
+            "subject_facing": sheet.subject_facing,
+            # Background & Scene
+            "initial_background": sheet.initial_background,
+            "background_objects": sheet.background_objects,
+            "visible_objects": sheet.visible_objects,
+            # Lighting & Composition
+            "lighting": sheet.lighting,
+            "color_palette": sheet.color_palette,
+            "image_composition": sheet.image_composition,
+            # Tags
+            "tags": sheet.semantic_tags,
+            # Episodic state
             "recent_states": recent_states_text,
             "current_clothing": merged.current_clothing,
             "current_state": merged.current_state,

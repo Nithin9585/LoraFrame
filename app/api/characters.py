@@ -137,21 +137,44 @@ async def create_character(
         traits = extraction_result.get("traits", {})
         if traits:
             updated_metadata = {
+                # Reference images
                 "reference_images": image_urls,
+                # Identity features (NEVER CHANGE)
                 "face": traits.get("face", "Not analyzed"),
                 "hair": traits.get("hair", "Not analyzed"),
                 "eyes": traits.get("eyes", "Not analyzed"),
+                "eyebrows": traits.get("eyebrows", "Not analyzed"),
                 "distinctives": traits.get("distinctives", "None"),
                 "build": traits.get("build", "Average"),
                 "age_range": traits.get("age_range", "Unknown"),
                 "skin_tone": traits.get("skin_tone", "Not specified"),
-                "tags": traits.get("tags", []),
                 "gender_presentation": traits.get("gender_presentation", ""),
+                "facial_expression": traits.get("facial_expression", "Not captured"),
+                # Outfit & accessories (preserve unless changed)
+                "initial_outfit": traits.get("initial_outfit", "Not captured"),
+                "accessories": traits.get("accessories", "None"),
+                "props_in_hands": traits.get("props_in_hands", "None"),
+                # Pose & position (preserve unless changed)
+                "pose": traits.get("pose", "Not captured"),
+                "hand_position": traits.get("hand_position", "Not captured"),
+                "camera_angle": traits.get("camera_angle", "eye-level"),
+                "camera_distance": traits.get("camera_distance", "medium"),
+                "subject_facing": traits.get("subject_facing", "camera"),
+                # Background & scene (preserve unless new location)
+                "initial_background": traits.get("initial_background", "Not captured"),
+                "background_objects": traits.get("background_objects", "Not captured"),
+                "visible_objects": traits.get("visible_objects", "None"),
+                # Lighting & composition (preserve unless changed)
+                "lighting": traits.get("lighting", "Not captured"),
+                "color_palette": traits.get("color_palette", "Not captured"),
+                "image_composition": traits.get("image_composition", "Not captured"),
+                # Tags and quality
+                "tags": traits.get("tags", []),
                 "faces_detected": extraction_result.get("faces_detected", 0),
                 "quality_score": extraction_result.get("quality_score", 0.0),
             }
             db_character.char_metadata = updated_metadata
-            print(f"[Characters API] [OK] char_metadata populated with {len(traits)} traits")
+            print(f"[Characters API] [OK] char_metadata populated with {len(updated_metadata)} fields")
         
         db.commit()
         db.refresh(db_character)
@@ -477,21 +500,45 @@ async def reextract_identity(
         traits = extraction_result.get("traits", {})
         if traits:
             updated_metadata = {
+                # Reference images
                 "reference_images": converted_urls,  # Store converted URLs
+                # Identity features (NEVER CHANGE)
                 "face": traits.get("face", metadata.get("face", "Not analyzed")),
                 "hair": traits.get("hair", metadata.get("hair", "Not analyzed")),
                 "eyes": traits.get("eyes", metadata.get("eyes", "Not analyzed")),
+                "eyebrows": traits.get("eyebrows", metadata.get("eyebrows", "Not analyzed")),
                 "distinctives": traits.get("distinctives", metadata.get("distinctives", "None")),
                 "build": traits.get("build", metadata.get("build", "Average")),
                 "age_range": traits.get("age_range", metadata.get("age_range", "Unknown")),
                 "skin_tone": traits.get("skin_tone", metadata.get("skin_tone", "Not specified")),
+                "gender_presentation": traits.get("gender_presentation", metadata.get("gender_presentation", "")),
+                "facial_expression": traits.get("facial_expression", metadata.get("facial_expression", "Not captured")),
+                # Outfit & accessories (preserve unless changed)
+                "initial_outfit": traits.get("initial_outfit", metadata.get("initial_outfit", "Not captured")),
+                "accessories": traits.get("accessories", metadata.get("accessories", "None")),
+                "props_in_hands": traits.get("props_in_hands", metadata.get("props_in_hands", "None")),
+                # Pose & position (preserve unless changed)
+                "pose": traits.get("pose", metadata.get("pose", "Not captured")),
+                "hand_position": traits.get("hand_position", metadata.get("hand_position", "Not captured")),
+                "camera_angle": traits.get("camera_angle", metadata.get("camera_angle", "eye-level")),
+                "camera_distance": traits.get("camera_distance", metadata.get("camera_distance", "medium")),
+                "subject_facing": traits.get("subject_facing", metadata.get("subject_facing", "camera")),
+                # Background & scene (preserve unless new location)
+                "initial_background": traits.get("initial_background", metadata.get("initial_background", "Not captured")),
+                "background_objects": traits.get("background_objects", metadata.get("background_objects", "Not captured")),
+                "visible_objects": traits.get("visible_objects", metadata.get("visible_objects", "None")),
+                # Lighting & composition (preserve unless changed)
+                "lighting": traits.get("lighting", metadata.get("lighting", "Not captured")),
+                "color_palette": traits.get("color_palette", metadata.get("color_palette", "Not captured")),
+                "image_composition": traits.get("image_composition", metadata.get("image_composition", "Not captured")),
+                # Tags and quality
                 "tags": traits.get("tags", metadata.get("tags", [])),
-                "gender_presentation": traits.get("gender_presentation", ""),
                 "faces_detected": extraction_result.get("faces_detected", 0),
                 "quality_score": extraction_result.get("quality_score", 0.0),
                 "last_extraction": datetime.utcnow().isoformat(),
             }
             character.char_metadata = updated_metadata
+            print(f"[Characters API] [OK] char_metadata updated with {len(updated_metadata)} fields")
         
         # Update base_image_url if it's an old GCS URL
         if character.base_image_url and character.base_image_url.startswith("https://storage.googleapis.com/"):
