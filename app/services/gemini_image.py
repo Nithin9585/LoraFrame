@@ -241,14 +241,6 @@ You MUST generate an image that is IDENTICAL to the reference image, changing ON
 ⚠️ If user says "different pose" → ONLY change pose, keep outfit/background/objects
 ⚠️ If user doesn't mention background → Background must be EXACTLY the same"""
                 contents.append(identity_prompt)
-2. Keep the EXACT SAME outfit unless the prompt explicitly says "wearing [new clothes]"
-3. Keep the EXACT SAME background/environment unless the prompt explicitly says "in [new location]" or "at [new place]"
-4. Keep the EXACT SAME lighting unless the prompt explicitly changes it
-5. Copy ALL distinctive marks (scars, moles, tattoos) to their exact locations
-
-⚠️ IF THE PROMPT DOES NOT MENTION A NEW LOCATION, KEEP THE ORIGINAL BACKGROUND!
-⚠️ IF THE PROMPT DOES NOT MENTION NEW CLOTHES, KEEP THE ORIGINAL OUTFIT!"""
-                contents.append(identity_prompt)
             else:
                 # No reference image, just use the prompt
                 contents.append(prompt)
