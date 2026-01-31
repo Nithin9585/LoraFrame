@@ -48,6 +48,7 @@ async def create_character(
     description: str = Form(None),
     consent: bool = Form(...),
     files: List[UploadFile] = File(...),
+    apply_description: bool = Form(default=False),  # NEW: Generate canonical image with description applied
     db: Session = Depends(get_db),
 ):
     """
@@ -59,6 +60,12 @@ async def create_character(
     3. Analyzes visual traits using Gemini Vision
     4. Stores semantic vector in VectorDB
     5. Populates char_metadata with identity data
+    6. (Optional) Generates canonical image with description applied
+    
+    Parameters:
+    - apply_description: If True, generates a NEW image with the description
+      applied (e.g., adds scars, tattoos, etc.) and uses THAT as the reference.
+      This ensures features like scars are visually present in the reference.
     
     The extracted data enables:
     - IDR (Identity Retention) scoring
@@ -179,6 +186,64 @@ async def create_character(
         db.commit()
         db.refresh(db_character)
         
+        # ============================================================
+        # OPTIONAL: Generate CANONICAL image with description applied
+        # ============================================================
+        if apply_description and description:
+            print(f"[Characters API] Generating canonical image with description applied...")
+            try:
+                from app.services.gemini_image import GeminiImageService
+                
+                gemini = GeminiImageService(storage_service=storage)
+                
+                # Build the canonical generation prompt
+                # This applies the user's description to create the "true" reference
+                canonical_prompt = f"""Apply the following modifications to this person's appearance:
+{description}
+
+CRITICAL INSTRUCTIONS:
+- Keep the SAME person (same face structure, same identity)
+- Apply ONLY the modifications described above
+- If description mentions a scar - ADD the scar visibly
+- If description mentions tattoo - ADD the tattoo visibly
+- If description mentions closed eye - SHOW the closed eye
+- If description mentions specific clothing - SHOW that clothing
+- Maintain photorealistic quality
+- This will become the CHARACTER'S CANONICAL APPEARANCE"""
+
+                # Generate the canonical image
+                canonical_bytes = await gemini.generate(
+                    prompt=canonical_prompt,
+                    aspect_ratio="1:1",  # Square for reference
+                    reference_image_url=image_urls[0],
+                    character_data=updated_metadata
+                )
+                
+                # Save the canonical image
+                canonical_path = f"characters/{character_id}/canonical.jpg"
+                canonical_url = await storage.upload_bytes(canonical_bytes, canonical_path)
+                
+                # Update the base_image_url to point to canonical image
+                db_character.base_image_url = canonical_url
+                
+                # Update metadata to track both original and canonical
+                updated_metadata["original_reference"] = image_urls[0]
+                updated_metadata["canonical_image"] = canonical_url
+                updated_metadata["description_applied"] = True
+                db_character.char_metadata = updated_metadata
+                
+                db.commit()
+                db.refresh(db_character)
+                
+                print(f"[Characters API] [OK] Canonical image generated: {canonical_url}")
+                print(f"[Characters API] Future generations will use the canonical image (with {description})")
+                
+            except Exception as gen_err:
+                print(f"[Characters API] [WARNING] Failed to generate canonical image: {gen_err}")
+                print(f"[Characters API] Falling back to original reference image")
+                import traceback
+                traceback.print_exc()
+        
         print(f"[Characters API] [OK] Character {character_id} created with full identity data")
         
     except Exception as e:
@@ -190,6 +255,120 @@ async def create_character(
         traceback.print_exc()
     
     return db_character
+
+
+@router.post("/{character_id}/apply-description", response_model=CharacterResponse)
+async def apply_description_to_character(
+    character_id: str,
+    description: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate a CANONICAL image with the description applied to an existing character.
+    
+    Use this when:
+    - Character was created without apply_description=True
+    - You want to add features like scars, tattoos, specific clothing
+    - You want to "bake in" visual features that text alone can't guarantee
+    
+    Example descriptions:
+    - "Add a small scar below the left eye"
+    - "Character has a dragon tattoo on right arm"
+    - "Left eye is always closed/squinting"
+    - "Wearing a red leather jacket"
+    
+    The generated image becomes the NEW reference for all future generations.
+    """
+    character = db.query(Character).filter(Character.id == character_id).first()
+    
+    if not character:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Character not found"
+        )
+    
+    metadata = character.char_metadata or {}
+    
+    # Get the original reference image (prefer original over canonical)
+    original_ref = metadata.get("original_reference", character.base_image_url)
+    if not original_ref:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No reference image available"
+        )
+    
+    storage = StorageService()
+    
+    try:
+        from app.services.gemini_image import GeminiImageService
+        
+        gemini = GeminiImageService(storage_service=storage)
+        
+        print(f"[Characters API] Applying description to {character_id}: {description}")
+        
+        # Build the canonical generation prompt
+        canonical_prompt = f"""Apply the following modifications to this person's appearance:
+{description}
+
+CRITICAL INSTRUCTIONS:
+- Keep the SAME person (same face structure, same identity)
+- Apply ONLY the modifications described above
+- If description mentions a scar - ADD the scar visibly
+- If description mentions tattoo - ADD the tattoo visibly  
+- If description mentions closed eye - SHOW the closed eye
+- If description mentions specific clothing - SHOW that clothing
+- Maintain photorealistic quality
+- This will become the CHARACTER'S CANONICAL APPEARANCE"""
+
+        # Generate the canonical image
+        canonical_bytes = await gemini.generate(
+            prompt=canonical_prompt,
+            aspect_ratio="1:1",
+            reference_image_url=original_ref,
+            character_data=metadata
+        )
+        
+        # Save the canonical image
+        canonical_path = f"characters/{character_id}/canonical.jpg"
+        canonical_url = await storage.upload_bytes(canonical_bytes, canonical_path)
+        
+        # Update the base_image_url to point to canonical image
+        character.base_image_url = canonical_url
+        
+        # Update metadata
+        metadata["original_reference"] = original_ref
+        metadata["canonical_image"] = canonical_url
+        metadata["description_applied"] = True
+        metadata["applied_description"] = description
+        
+        # Also update distinctives if description mentions scars/marks
+        desc_lower = description.lower()
+        current_distinctives = metadata.get("distinctives", "")
+        if any(word in desc_lower for word in ["scar", "tattoo", "mole", "birthmark", "piercing"]):
+            if current_distinctives and current_distinctives != "None":
+                metadata["distinctives"] = f"{current_distinctives}; {description}"
+            else:
+                metadata["distinctives"] = description
+        
+        character.char_metadata = metadata
+        character.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(character)
+        
+        print(f"[Characters API] [OK] Canonical image generated: {canonical_url}")
+        print(f"[Characters API] Character {character_id} now has '{description}' applied")
+        
+        return character
+        
+    except Exception as e:
+        print(f"[Characters API] [ERROR] Failed to apply description: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to apply description: {str(e)}"
+        )
 
 
 @router.get("", response_model=List[CharacterResponse])
