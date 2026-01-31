@@ -74,29 +74,18 @@ async def create_character(
     character_id = f"char_{uuid.uuid4().hex[:8]}"
     storage = StorageService()
     
-    # 1. Upload initial file (Temporary Reference)
+    # 1. Upload initial file (Temporary Reference - will be deleted after canonical generation)
     try:
         original_url = await storage.upload_file(
             file=files[0],
-            path=f"characters/{character_id}/original_upload.jpg"
+            path=f"characters/{character_id}/temp_upload.jpg"
         )
+        print(f"[Characters API] Temporary upload saved: {original_url}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload: {e}")
     
-    # Create DB Record (initially pointing to upload, updated immediately after)
-    db_character = Character(
-        id=character_id, 
-        name=name, 
-        description=description,
-        base_image_url=original_url, # Temporary
-        consent_given_at=datetime.utcnow(),
-        char_metadata={"original_upload": original_url}
-    )
-    db.add(db_character)
-    db.commit()
-    
     try:
-        # 2. Generate CANONICAL Image
+        # 2. Generate CANONICAL Image (REQUIRED - this is the only image we keep)
         from app.services.gemini_image import GeminiImageService
         gemini = GeminiImageService(storage_service=storage)
         
@@ -111,9 +100,10 @@ REQUIREMENTS:
 - Apply the described modifications (clothing, scars, etc.)
 - This will be the PRIMARY reference image for this character."""
 
+        # CRITICAL FIX: Use correct parameter name 'reference_image_url'
         canonical_bytes = await gemini.generate(
             prompt=canonical_prompt,
-            base_image_url=original_url,
+            reference_image_url=original_url,  # ← FIXED: Was base_image_url
             aspect_ratio="1:1"
         )
         
@@ -121,60 +111,78 @@ REQUIREMENTS:
             canonical_bytes, 
             f"characters/{character_id}/canonical.jpg"
         )
+        print(f"[Characters API] Canonical image created: {canonical_url}")
         
-        # 3. Update Character to use Canonical Image
-        db_character.base_image_url = canonical_url
+        # 3. DELETE the temporary uploaded image - we don't need it anymore
+        try:
+            await storage.delete_folder(f"characters/{character_id}/temp_upload.jpg")
+            print(f"[Characters API] Deleted temporary upload")
+        except Exception as delete_err:
+            print(f"[Characters API] Warning: Could not delete temp upload: {delete_err}")
         
-        # CRITICAL: references also point to canonical
-        # The original upload is no longer used for generation/analysis
-        current_meta = db_character.char_metadata or {}
-        current_meta["reference_images"] = [canonical_url]
-        current_meta["original_upload"] = original_url 
-        db_character.char_metadata = current_meta
-        
+        # 4. Create DB Record with ONLY canonical image (no uploaded image URL stored)
+        db_character = Character(
+            id=character_id, 
+            name=name, 
+            description=description,
+            base_image_url=canonical_url,  # ← ONLY canonical image
+            consent_given_at=datetime.utcnow(),
+            char_metadata={
+                "reference_images": [canonical_url]  # ← ONLY canonical image
+                # NO original_upload - it's deleted and not tracked
+            }
+        )
+        db.add(db_character)
         db.commit()
         db.refresh(db_character)
-        print(f"[Characters API] Canonical Image Set: {canonical_url}")
+        print(f"[Characters API] Character created with canonical image only")
         
-        # 4. Analyze the CANONICAL Image (Extraction)
+        # 5. Analyze the CANONICAL Image (Extraction)
         # We STRICTLY use the generated image for analysis
         from app.workers.extractor import extract_identity_task
-        print(f"[Characters API] Analyzing generated canonical image...")
+        print(f"[Characters API] Analyzing canonical image for identity extraction...")
         
         extraction_result = await extract_identity_task(
             character_id=character_id,
-            image_urls=[canonical_url], # STRICTLY generated image
+            image_urls=[canonical_url],  # STRICTLY canonical image
             metadata={"name": name, "description": description}
         )
         
         # Update DB with analysis results
         if extraction_result.get("vector_id"):
             db_character.semantic_vector_id = extraction_result["vector_id"]
+            print(f"[Characters API] Semantic vector created: {extraction_result['vector_id']}")
             
         traits = extraction_result.get("traits", {})
         if traits:
-            # Merge traits into metadata
-            # We keep reference_images as [canonical_url]
-            updated_meta = db_character.char_metadata
+            # Merge traits into metadata (keeping reference_images as [canonical_url])
+            updated_meta = db_character.char_metadata or {}
             updated_meta.update(traits)
-            
-            # Ensure complex fields are preserved if needed or just dump everything
-            # The extraction task returns a flat dict of traits mainly, plus 'clothing' etc
-            # We trust the extractor.
+            # Ensure reference_images stays as canonical only
+            updated_meta["reference_images"] = [canonical_url]
             
             db_character.char_metadata = updated_meta
             db.commit()
-            print(f"[Characters API] Character analysis complete based on canonical image.")
+            print(f"[Characters API] Character analysis complete. Identity extracted from canonical image.")
+        
+        return db_character
             
     except Exception as e:
-        print(f"[Characters API] Error during generation/analysis: {e}")
+        print(f"[Characters API] CRITICAL ERROR during canonical image generation: {e}")
         import traceback
         traceback.print_exc()
-        # We don't fail the request, we return the character as-is (maybe with original image)
-        # But per user request "there is no use of ref image", failing here would mean broken character.
-        # We'll leave it as best-effort.
-
-    return db_character
+        
+        # Clean up the temporary upload
+        try:
+            await storage.delete_folder(f"characters/{character_id}/temp_upload.jpg")
+        except:
+            pass
+        
+        # FAIL the character creation - we MUST have a canonical image
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create canonical image: {str(e)}. Character creation aborted."
+        )
 
 
 @router.post("/{character_id}/apply-description", response_model=CharacterResponse)
@@ -241,10 +249,11 @@ CRITICAL INSTRUCTIONS:
 - This will become the CHARACTER'S CANONICAL APPEARANCE"""
 
         # Generate the canonical image
+        # CRITICAL FIX: Use correct parameter name 'reference_image_url'
         canonical_bytes = await gemini.generate(
             prompt=canonical_prompt,
             aspect_ratio="1:1",
-            base_image_url=original_ref,
+            reference_image_url=original_ref,  # ← FIXED: Was base_image_url
             character_data=metadata
         )
         
