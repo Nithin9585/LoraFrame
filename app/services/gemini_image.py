@@ -143,6 +143,7 @@ class GeminiImageService:
                 # Extract ALL traits to FORCE into the generation - EVERY detail matters
                 traits_prompt = ""
                 identity_confidence = ""
+                mandatory_features = []  # Features that MUST appear in output
                 
                 if character_data:
                     # Identity features
@@ -173,6 +174,40 @@ class GeminiImageService:
                     color_palette = character_data.get("color_palette", "")
                     image_composition = character_data.get("image_composition", "")
                     tags = character_data.get("tags", [])
+                    
+                    # ============================================================
+                    # MANDATORY FEATURES - These MUST appear in every generation
+                    # ============================================================
+                    mandatory_features.append("🚨 MANDATORY CHARACTER FEATURES - MUST BE VISIBLE IN OUTPUT 🚨")
+                    
+                    # Face is ALWAYS mandatory
+                    if face and len(face) > 3 and face != "Not specified" and face != "Not analyzed":
+                        mandatory_features.append(f"✓ FACE: {face}")
+                    
+                    # Eyes are ALWAYS mandatory  
+                    if eyes and len(eyes) > 3 and eyes != "Not specified" and eyes != "Not analyzed":
+                        mandatory_features.append(f"✓ EYES: {eyes}")
+                    
+                    # Hair is ALWAYS mandatory
+                    if hair and len(hair) > 3 and hair != "Not specified" and hair != "Not analyzed":
+                        mandatory_features.append(f"✓ HAIR: {hair}")
+                    
+                    # Skin tone is mandatory
+                    if skin_tone and len(skin_tone) > 3 and skin_tone != "Not specified":
+                        mandatory_features.append(f"✓ SKIN TONE: {skin_tone}")
+                    
+                    # DISTINCTIVE MARKS ARE CRITICAL - scars, moles, tattoos, etc.
+                    if distinctives and len(distinctives) > 3 and distinctives.lower() not in ["none", "none detected", "not specified"]:
+                        mandatory_features.append(f"⚠️ CRITICAL DISTINCTIVE MARKS - MUST BE VISIBLE: {distinctives}")
+                        mandatory_features.append(f"   ↳ If this is a scar, it MUST appear in the generated image")
+                        mandatory_features.append(f"   ↳ If this is a tattoo, it MUST be visible")
+                        mandatory_features.append(f"   ↳ If this is a mole/birthmark, include it")
+                    
+                    # Build/body type
+                    if build and len(build) > 3 and build != "Average" and build != "Not specified":
+                        mandatory_features.append(f"✓ BUILD: {build}")
+                    
+                    mandatory_features.append("")  # Empty line
                     
                     traits_list = []
                     # CRITICAL IDENTITY FEATURES - Must be preserved
@@ -215,34 +250,57 @@ class GeminiImageService:
                     if traits_list:
                         traits_prompt = "\n".join(traits_list)
                     
+                    # Build mandatory features string
+                    mandatory_prompt = "\n".join(mandatory_features) if mandatory_features else ""
+                    
                     # If we have semantic vector, emphasize identity preservation
                     if semantic_vector is not None:
                         identity_confidence = "\n\n⚠️ CRITICAL: This character has verified identity. Preserve EVERY pixel-level detail!"
                         print(f"[Gemini] Using semantic vector for identity preservation (embedding shape: {semantic_vector.shape})")
+                    
+                    # Log mandatory features for debugging
+                    print(f"[Gemini] Mandatory features to enforce: {len([f for f in mandatory_features if f.startswith('✓') or f.startswith('⚠️')])}")
 
                 # Enhanced prompt that tells Gemini to preserve EVERYTHING
-                identity_prompt = f"""PIXEL-PERFECT CHARACTER RECREATION - PRESERVE EVERY DETAIL
+                # PUT MANDATORY FEATURES FIRST - before anything else
+                identity_prompt = f"""🚨 CRITICAL INSTRUCTION: CHARACTER CONSISTENCY IS MANDATORY 🚨
 
-You MUST generate an image that is IDENTICAL to the reference image, changing ONLY what is explicitly requested.
+{mandatory_prompt}
 
-[COMPLETE VISUAL STATE TO PRESERVE]
+The above features are NON-NEGOTIABLE. They MUST appear in the generated image.
+If the character has a scar - THE SCAR MUST BE VISIBLE.
+If the character has a specific eye color - THAT EXACT COLOR MUST APPEAR.
+If the character has a tattoo - THE TATTOO MUST BE VISIBLE.
+
+---
+
+[REFERENCE IMAGE ANALYSIS]
+Study the reference image carefully. This is the EXACT person you must recreate.
+
+[COMPLETE CHARACTER PROFILE]
 {traits_prompt}{identity_confidence}
 
-[USER REQUEST]
+[USER'S REQUEST FOR THIS SCENE]
 {prompt}
 
-[ABSOLUTE RULES - EVERY SMALL DETAIL MATTERS]
-1. IDENTITY: Same face, eyes, hair, skin - IDENTICAL to reference
-2. OUTFIT: Same clothes, same colors, same fit - unless user says "wearing [new]"
-3. ACCESSORIES: Same jewelry, glasses, watch - keep everything
-4. HANDS: Same position, holding same items - unless user changes it
-5. BACKGROUND: EVERY object in background must be the same - unless user says "in [new location]"
-6. LIGHTING: Same direction, same shadows, same warmth - unless user changes it
-7. COMPOSITION: Same framing, same angle - unless user requests different
-8. SMALL OBJECTS: If there's a plant, cup, book, picture frame - keep them ALL
+[GENERATION RULES - READ CAREFULLY]
+1. START with the mandatory features listed above - they define WHO this person is
+2. The reference image shows the EXACT appearance - match it precisely
+3. Change ONLY what the user explicitly requests
+4. If user doesn't mention something → KEEP IT EXACTLY THE SAME
 
-⚠️ If user says "make them smile" → ONLY change expression, keep EVERYTHING else
-⚠️ If user says "different pose" → ONLY change pose, keep outfit/background/objects
+[WHAT TO GENERATE]
+Generate a photorealistic image of this EXACT person with:
+- ALL mandatory features visible (face, eyes, hair, skin tone, distinctive marks)
+- The scene/action described in the user request
+- Everything else preserved from the reference
+
+[FAILURE CONDITIONS - AVOID THESE]
+❌ DO NOT generate a different person
+❌ DO NOT remove scars, tattoos, or distinctive marks
+❌ DO NOT change eye color, hair color, or skin tone
+❌ DO NOT change outfit unless user requested it
+❌ DO NOT change background unless user requested it
 ⚠️ If user doesn't mention background → Background must be EXACTLY the same"""
                 contents.append(identity_prompt)
             else:
