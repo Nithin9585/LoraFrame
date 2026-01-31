@@ -140,11 +140,12 @@ class GeminiImageService:
             
             # Create the prompt with identity instruction if we have reference images
             if ref_image_bytes:
-                # Extract explicit traits to FORCE into the generation
+                # Extract ALL traits to FORCE into the generation - EVERY detail matters
                 traits_prompt = ""
                 identity_confidence = ""
                 
                 if character_data:
+                    # Identity features
                     face = character_data.get("face", "")
                     distinctives = character_data.get("distinctives", "")
                     hair = character_data.get("hair", "")
@@ -152,15 +153,28 @@ class GeminiImageService:
                     eyebrows = character_data.get("eyebrows", "")
                     build = character_data.get("build", "")
                     skin_tone = character_data.get("skin_tone", "")
+                    facial_expression = character_data.get("facial_expression", "")
+                    # Outfit & accessories
                     initial_outfit = character_data.get("initial_outfit", "")
-                    initial_background = character_data.get("initial_background", "")
-                    pose = character_data.get("pose", "")
-                    lighting = character_data.get("lighting", "")
                     accessories = character_data.get("accessories", "")
+                    props_in_hands = character_data.get("props_in_hands", "")
+                    # Pose & position
+                    pose = character_data.get("pose", "")
+                    hand_position = character_data.get("hand_position", "")
+                    body_angle = character_data.get("body_angle", "")
+                    # Background & scene
+                    initial_background = character_data.get("initial_background", "")
+                    background_objects = character_data.get("background_objects", "")
+                    visible_objects = character_data.get("visible_objects", "")
+                    # Lighting & composition
+                    lighting = character_data.get("lighting", "")
+                    color_palette = character_data.get("color_palette", "")
+                    image_composition = character_data.get("image_composition", "")
                     tags = character_data.get("tags", [])
                     
                     traits_list = []
                     # CRITICAL IDENTITY FEATURES - Must be preserved
+                    traits_list.append("=== CHARACTER IDENTITY (NEVER CHANGE) ===")
                     if face and len(face) > 3: traits_list.append(f"FACE: {face}")
                     if eyes and len(eyes) > 3: traits_list.append(f"EYES: {eyes}")
                     if eyebrows and len(eyebrows) > 3: traits_list.append(f"EYEBROWS: {eyebrows}")
@@ -168,36 +182,65 @@ class GeminiImageService:
                     if skin_tone and len(skin_tone) > 3: traits_list.append(f"SKIN TONE: {skin_tone}")
                     if build and len(build) > 3: traits_list.append(f"BUILD: {build}")
                     if distinctives and len(distinctives) > 3: traits_list.append(f"DISTINCTIVE MARKS: {distinctives}")
-                    # OUTFIT - Use initial if no scene change
-                    if initial_outfit and len(initial_outfit) > 3: traits_list.append(f"OUTFIT (KEEP SAME): {initial_outfit}")
+                    if facial_expression and len(facial_expression) > 3: traits_list.append(f"EXPRESSION: {facial_expression}")
+                    
+                    # OUTFIT & WHAT THEY'RE HOLDING
+                    traits_list.append("\n=== OUTFIT & ITEMS (KEEP UNLESS CHANGED) ===")
+                    if initial_outfit and len(initial_outfit) > 3: traits_list.append(f"OUTFIT: {initial_outfit}")
                     if accessories and len(accessories) > 3: traits_list.append(f"ACCESSORIES: {accessories}")
-                    # BACKGROUND - CRITICAL: Preserve unless explicitly changed
-                    if initial_background and len(initial_background) > 3: traits_list.append(f"BACKGROUND (KEEP SAME): {initial_background}")
+                    if props_in_hands and len(props_in_hands) > 3: traits_list.append(f"HOLDING IN HANDS: {props_in_hands}")
+                    
+                    # POSE & POSITION
+                    traits_list.append("\n=== POSE & POSITION (KEEP UNLESS CHANGED) ===")
                     if pose and len(pose) > 3: traits_list.append(f"POSE: {pose}")
-                    if lighting and len(lighting) > 3: traits_list.append(f"LIGHTING (KEEP SAME): {lighting}")
-                    if tags: traits_list.append(f"Style: {', '.join(tags[:5])}")
+                    if hand_position and len(hand_position) > 3: traits_list.append(f"HAND POSITION: {hand_position}")
+                    if body_angle and len(body_angle) > 3: traits_list.append(f"BODY ANGLE/CAMERA: {body_angle}")
+                    
+                    # BACKGROUND & ALL OBJECTS
+                    traits_list.append("\n=== BACKGROUND & OBJECTS (KEEP UNLESS NEW LOCATION) ===")
+                    if initial_background and len(initial_background) > 3: traits_list.append(f"BACKGROUND: {initial_background}")
+                    if background_objects and len(background_objects) > 3: traits_list.append(f"BACKGROUND OBJECTS: {background_objects}")
+                    if visible_objects and len(visible_objects) > 3: traits_list.append(f"VISIBLE OBJECTS: {visible_objects}")
+                    
+                    # LIGHTING & COMPOSITION
+                    traits_list.append("\n=== LIGHTING & COMPOSITION (KEEP UNLESS CHANGED) ===")
+                    if lighting and len(lighting) > 3: traits_list.append(f"LIGHTING: {lighting}")
+                    if color_palette and len(color_palette) > 3: traits_list.append(f"COLOR PALETTE: {color_palette}")
+                    if image_composition and len(image_composition) > 3: traits_list.append(f"COMPOSITION: {image_composition}")
                     
                     if traits_list:
                         traits_prompt = "\n".join(traits_list)
                     
                     # If we have semantic vector, emphasize identity preservation
                     if semantic_vector is not None:
-                        identity_confidence = "\n\n⚠️ CRITICAL: Maintain EXACT facial features, skin tone, and body proportions from reference!"
+                        identity_confidence = "\n\n⚠️ CRITICAL: This character has verified identity. Preserve EVERY pixel-level detail!"
                         print(f"[Gemini] Using semantic vector for identity preservation (embedding shape: {semantic_vector.shape})")
 
-                # Enhanced prompt that tells Gemini to use the reference for identity + explicit traits
-                identity_prompt = f"""REFERENCE-BASED CHARACTER GENERATION - PRESERVE EVERYTHING
+                # Enhanced prompt that tells Gemini to preserve EVERYTHING
+                identity_prompt = f"""PIXEL-PERFECT CHARACTER RECREATION - PRESERVE EVERY DETAIL
 
-You MUST generate an image of the EXACT SAME PERSON shown in the reference image.
+You MUST generate an image that is IDENTICAL to the reference image, changing ONLY what is explicitly requested.
 
-[MANDATORY - PRESERVE FROM REFERENCE IMAGE]
+[COMPLETE VISUAL STATE TO PRESERVE]
 {traits_prompt}{identity_confidence}
 
-[SCENE REQUEST]
+[USER REQUEST]
 {prompt}
 
-[CRITICAL GENERATION RULES]
-1. The person MUST have IDENTICAL features to the reference (face, eyes, hair, skin)
+[ABSOLUTE RULES - EVERY SMALL DETAIL MATTERS]
+1. IDENTITY: Same face, eyes, hair, skin - IDENTICAL to reference
+2. OUTFIT: Same clothes, same colors, same fit - unless user says "wearing [new]"
+3. ACCESSORIES: Same jewelry, glasses, watch - keep everything
+4. HANDS: Same position, holding same items - unless user changes it
+5. BACKGROUND: EVERY object in background must be the same - unless user says "in [new location]"
+6. LIGHTING: Same direction, same shadows, same warmth - unless user changes it
+7. COMPOSITION: Same framing, same angle - unless user requests different
+8. SMALL OBJECTS: If there's a plant, cup, book, picture frame - keep them ALL
+
+⚠️ If user says "make them smile" → ONLY change expression, keep EVERYTHING else
+⚠️ If user says "different pose" → ONLY change pose, keep outfit/background/objects
+⚠️ If user doesn't mention background → Background must be EXACTLY the same"""
+                contents.append(identity_prompt)
 2. Keep the EXACT SAME outfit unless the prompt explicitly says "wearing [new clothes]"
 3. Keep the EXACT SAME background/environment unless the prompt explicitly says "in [new location]" or "at [new place]"
 4. Keep the EXACT SAME lighting unless the prompt explicitly changes it

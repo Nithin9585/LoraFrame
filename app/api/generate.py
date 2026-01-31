@@ -170,24 +170,39 @@ async def generate_image(
                 print(f"[WARNING] Failed to retrieve semantic vector: {vec_err}")
         
         # Build character_data from memory context for generation
+        # Include ALL captured details for pixel-perfect recreation
+        char_meta = character.char_metadata or {}
         character_data = {
             "name": memory_context.get("name", character.name),
             "face": memory_context.get("face", ""),
             "hair": memory_context.get("hair", ""),
             "eyes": memory_context.get("eyes", ""),
+            "eyebrows": char_meta.get("eyebrows", ""),
             "distinctives": memory_context.get("distinctives", ""),
             "build": memory_context.get("build", ""),
             "age_range": memory_context.get("age_range", ""),
             "tags": memory_context.get("tags", []),
-            "skin_tone": character.char_metadata.get("skin_tone", "") if character.char_metadata else "",
-            "gender_presentation": character.char_metadata.get("gender_presentation", "") if character.char_metadata else "",
-            "initial_outfit": character.char_metadata.get("initial_outfit", "") if character.char_metadata else "",
-            "initial_background": character.char_metadata.get("initial_background", "") if character.char_metadata else "",
-            "pose": character.char_metadata.get("pose", "") if character.char_metadata else "",
-            "lighting": character.char_metadata.get("lighting", "") if character.char_metadata else "",
-            "accessories": character.char_metadata.get("accessories", "") if character.char_metadata else "",
-            "eyebrows": character.char_metadata.get("eyebrows", "") if character.char_metadata else "",
-            "semantic_vector": semantic_vector,  # Pass for identity verification
+            "skin_tone": char_meta.get("skin_tone", ""),
+            "gender_presentation": char_meta.get("gender_presentation", ""),
+            "facial_expression": char_meta.get("facial_expression", ""),
+            # Outfit & Accessories
+            "initial_outfit": char_meta.get("initial_outfit", ""),
+            "accessories": char_meta.get("accessories", ""),
+            "props_in_hands": char_meta.get("props_in_hands", ""),
+            # Pose & Position
+            "pose": char_meta.get("pose", ""),
+            "hand_position": char_meta.get("hand_position", ""),
+            "body_angle": char_meta.get("body_angle", ""),
+            # Background & Scene
+            "initial_background": char_meta.get("initial_background", ""),
+            "background_objects": char_meta.get("background_objects", ""),
+            "visible_objects": char_meta.get("visible_objects", ""),
+            # Lighting & Composition
+            "lighting": char_meta.get("lighting", ""),
+            "color_palette": char_meta.get("color_palette", ""),
+            "image_composition": char_meta.get("image_composition", ""),
+            # Identity vector
+            "semantic_vector": semantic_vector,
         }
         
         # Get episodic states from memory context (already processed by engine)

@@ -150,11 +150,19 @@ async def extract_visual_traits(
         "age_range": "Unknown",
         "skin_tone": "Not specified",
         "gender_presentation": "Not specified",
+        "facial_expression": "Not captured",
         "initial_outfit": "Not captured",
         "initial_background": "Not captured",
+        "background_objects": "Not captured",
         "accessories": "None",
+        "props_in_hands": "None",
+        "visible_objects": "None",
         "pose": "Not captured",
+        "hand_position": "Not captured",
+        "body_angle": "Not captured",
         "lighting": "Not captured",
+        "color_palette": "Not captured",
+        "image_composition": "Not captured",
         "tags": []
     }
     
@@ -185,17 +193,29 @@ Extract the following details in JSON format:
     "age_range": "Estimated age range (e.g., '25-30', 'mid-30s')",
     "skin_tone": "Specific skin complexion (e.g., 'fair/porcelain', 'light olive', 'medium tan', 'deep brown', 'dark ebony')",
     "gender_presentation": "How the person presents (masculine, feminine, androgynous)",
-    "initial_outfit": "EXACT description of what they are wearing in this image (colors, style, fabric type if visible)",
-    "initial_background": "EXACT description of the background/environment/setting in this image (indoor/outdoor, colors, objects, location type, atmosphere)",
-    "accessories": "Any accessories visible (jewelry, glasses, watch, etc.)",
-    "pose": "Description of the person's pose/position (standing, sitting, angle, hand position)",
-    "lighting": "Description of the lighting (natural, studio, warm, cool, direction, shadows)",
-    "tags": ["list", "of", "10-15", "descriptive", "tags", "including", "style", "vibe", "aesthetic"]
+    "facial_expression": "EXACT expression (smiling, neutral, serious, laughing, etc.) and emotion conveyed",
+    "initial_outfit": "EXACT description of clothing (colors with specific shades, patterns, style, fabric type, how it fits)",
+    "initial_background": "COMPLETE background description (location type, colors, textures, atmosphere, depth)",
+    "background_objects": "LIST every object visible in background (furniture, plants, decorations, wall items, etc.)",
+    "accessories": "ALL accessories (jewelry type/color/position, glasses style, watch, belt, etc.)",
+    "props_in_hands": "What the person is holding or touching (phone, cup, book, nothing, etc.)",
+    "visible_objects": "ALL objects visible in the image (on table, nearby, in frame)",
+    "pose": "EXACT body pose (standing/sitting/leaning, body angle, weight distribution)",
+    "hand_position": "EXACT hand positions (in pockets, crossed, holding something, resting where)",
+    "body_angle": "Camera angle relative to subject (front, 3/4, profile, looking direction)",
+    "lighting": "DETAILED lighting (source direction, type, shadows, highlights, color temperature)",
+    "color_palette": "Dominant colors in the entire image (list 5-7 main colors)",
+    "image_composition": "How the image is framed (headshot, half-body, full-body, centered, rule of thirds)",
+    "tags": ["list", "of", "15-20", "descriptive", "tags", "for", "every", "visual", "element"]
 }
 
-Be EXTREMELY specific and precise - this data will be used to recreate this EXACT person in AI-generated images.
-Include EVERY visible detail. Colors must be exact (not just 'brown' but 'warm chestnut brown').
-The background/environment description is CRITICAL - it must be preserved unless explicitly changed.
+CRITICAL INSTRUCTIONS:
+- This data will be used to recreate this EXACT image with the EXACT same person.
+- EVERY tiny detail matters: small objects, shadows, reflections, textures.
+- Colors must be EXACT (not 'blue' but 'navy blue with slight purple undertone').
+- Positions must be PRECISE (not 'hand up' but 'right hand raised to shoulder height, palm facing camera').
+- Background objects matter: if there's a plant, describe it. If there's a picture frame, describe it.
+- NOTHING should be omitted - if you can see it, describe it.
 Return ONLY the JSON object, no additional text."""
         
         # Load the image and analyze it

@@ -10,27 +10,36 @@ from app.core.config import settings
 class GroqLLMService:
     """Service for Groq LLM operations."""
     
-    PROMPT_TEMPLATE = """You are an expert at creating detailed image generation prompts for CONSISTENT character AI.
+    PROMPT_TEMPLATE = """You are an expert at creating PIXEL-PERFECT image generation prompts that preserve EVERY detail.
 
 [CHARACTER_IDENTITY - ABSOLUTELY IMMUTABLE - COPY EXACTLY]
 Name: {name}
 Face Structure: {face_description}
+Facial Expression: {facial_expression}
 Hair (EXACT): {hair}
 Eyes (EXACT): {eyes}
 Skin Tone: {skin_tone}
 Distinctive Features: {distinctive_marks}
 Age: {age_range}
 Build: {build}
-Character Tags: {semantic_tags}
 
-[INITIAL APPEARANCE - Character's canonical look (PRESERVE UNLESS EXPLICITLY CHANGED)]
-Original Outfit: {initial_outfit}
-Original Background/Setting: {initial_background}
-Original Pose: {initial_pose}
-Original Lighting: {initial_lighting}
+[COMPLETE VISUAL STATE - PRESERVE EVERYTHING UNLESS EXPLICITLY CHANGED]
+Outfit: {initial_outfit}
 Accessories: {accessories}
+Props in Hands: {props_in_hands}
+Hand Position: {hand_position}
+Pose/Body Angle: {initial_pose}
+Body Angle/Camera: {body_angle}
 
-[CURRENT STATE - Override only if scene EXPLICITLY changes it]
+[SCENE/ENVIRONMENT - PRESERVE EXACTLY UNLESS EXPLICITLY CHANGED]
+Background: {initial_background}
+Background Objects: {background_objects}
+Visible Objects: {visible_objects}
+Lighting: {initial_lighting}
+Color Palette: {color_palette}
+Image Composition: {image_composition}
+
+[CURRENT STATE - From previous scenes]
 Currently wearing: {current_clothing}
 Current physical state: {current_state}
 Currently holding/has: {current_props}
@@ -42,32 +51,32 @@ Currently holding/has: {current_props}
 {user_prompt}
 
 [TASK]
-Create a PRECISE image generation prompt that:
-1. COPIES VERBATIM the character's facial features, eye color, hair color/style, skin tone, and distinctive marks
-2. MAINTAINS the character's outfit from [CURRENT STATE] - if "Not established yet", use [INITIAL APPEARANCE] outfit
-3. ONLY changes clothing if the new scene EXPLICITLY requests a costume change
-4. Includes ALL distinctive features (scars, moles, tattoos, piercings) in EXACT locations
-5. Fulfills the scene request while keeping the character IDENTICAL
+Generate a prompt that recreates the EXACT SAME IMAGE with the EXACT SAME PERSON, changing ONLY what the user explicitly requests.
 
-[MANDATORY RULES - VIOLATION IS FAILURE]
-❌ NEVER change: eye color, hair color, skin tone, facial structure, distinctive marks
-❌ NEVER change: body type, height, age appearance
-❌ NEVER change: outfit UNLESS prompt explicitly says "wearing [X]" or "changed into [X]"
-❌ NEVER change: background/environment UNLESS prompt explicitly says "in [new location]" or "at [new place]"
-❌ NEVER change: pose UNLESS prompt explicitly requests a different pose
-❌ NEVER change: lighting UNLESS prompt explicitly requests different lighting
-✅ ALWAYS preserve the EXACT background from [INITIAL APPEARANCE] if no new location is specified
-✅ ALWAYS include: EXACT eye color, EXACT hair description, ALL distinctive marks
-✅ ALWAYS start the prompt with detailed character description BEFORE the scene
-✅ Format: [Character] + [Same outfit unless changed] + [Same background unless changed] + [Same lighting unless changed]
+[ABSOLUTE RULES - EVERY DETAIL MATTERS]
+❌ NEVER change ANY of these unless user EXPLICITLY mentions changing them:
+   - Face, eyes, hair, skin, distinctive marks
+   - Outfit, accessories, what's in hands
+   - Background, objects in scene, lighting
+   - Pose, hand position, body angle
+   - Color palette, composition
+
+✅ PRESERVE EXACTLY:
+   - Every small object in the background
+   - Hand positions and what they're holding
+   - Facial expression
+   - All accessories (jewelry, glasses, etc.)
+   - Lighting direction and shadows
+   - Color temperature and mood
 
 [OUTPUT FORMAT]
-A [gender] with [EXACT face description], [EXACT eye color and shape], [EXACT hair color/style/length], [EXACT skin tone], [ALL distinctive marks with locations]. Wearing [SAME outfit from INITIAL APPEARANCE unless prompt specifies new clothing]. [Pose - same unless changed]. In [SAME background from INITIAL APPEARANCE unless prompt specifies new location]. [SAME lighting unless changed]. Photorealistic, 8K, detailed skin texture.
+[EXACT character description with ALL features] + [EXACT outfit unless changed] + [EXACT accessories] + [Holding EXACT same items unless changed] + [EXACT pose unless changed] + [In EXACT same background with ALL objects unless new location specified] + [EXACT same lighting unless changed]. [Same composition/framing]. Photorealistic, 8K.
 
-CRITICAL: If the user prompt does NOT mention a new location/background, use the EXACT background from [INITIAL APPEARANCE].
-CRITICAL: If the user prompt does NOT mention new clothes, use the EXACT outfit from [INITIAL APPEARANCE].
+CRITICAL: If user says "make them smile" - change ONLY the expression. Keep EVERYTHING else identical.
+CRITICAL: If user says "different pose" - change ONLY the pose. Keep outfit, background, objects, lighting identical.
+CRITICAL: If user doesn't mention background - the background must be EXACTLY the same including every small object.
 
-Generate ONLY the final prompt - no explanations:"""
+Generate ONLY the final prompt:"""
 
 
     SUMMARIZE_TEMPLATE = """Analyze this generated image and extract:
@@ -157,18 +166,25 @@ Return a JSON object with these fields:
         filled_prompt = self.PROMPT_TEMPLATE.format(
             name=character_data.get("name", "Unknown Character"),
             face_description=character_data.get("face", "Not specified"),
+            facial_expression=character_data.get("facial_expression", "Not captured"),
             hair=character_data.get("hair", "Not specified"),
             eyes=character_data.get("eyes", "Not specified"),
             skin_tone=character_data.get("skin_tone", "Not specified"),
             distinctive_marks=character_data.get("distinctives", "None"),
             age_range=character_data.get("age_range", "Adult"),
             build=character_data.get("build", "Average"),
-            semantic_tags=", ".join(character_data.get("tags", [])) or "None specified",
             initial_outfit=character_data.get("initial_outfit", "Not captured"),
             initial_background=character_data.get("initial_background", "Not captured"),
+            background_objects=character_data.get("background_objects", "Not captured"),
+            visible_objects=character_data.get("visible_objects", "Not captured"),
             initial_pose=character_data.get("pose", "Not captured"),
+            hand_position=character_data.get("hand_position", "Not captured"),
+            body_angle=character_data.get("body_angle", "Not captured"),
             initial_lighting=character_data.get("lighting", "Not captured"),
+            color_palette=character_data.get("color_palette", "Not captured"),
+            image_composition=character_data.get("image_composition", "Not captured"),
             accessories=character_data.get("accessories", "None"),
+            props_in_hands=character_data.get("props_in_hands", "Nothing"),
             current_clothing=", ".join(current_clothing) if current_clothing else "Not established yet - use initial outfit",
             current_state=", ".join(current_state) if current_state else "Normal, healthy",
             current_props=", ".join(current_props) if current_props else "None",
