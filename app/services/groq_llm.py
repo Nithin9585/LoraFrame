@@ -28,8 +28,10 @@ Outfit: {initial_outfit}
 Accessories: {accessories}
 Props in Hands: {props_in_hands}
 Hand Position: {hand_position}
-Pose/Body Angle: {initial_pose}
-Body Angle/Camera: {body_angle}
+Pose: {initial_pose}
+Camera Angle: {camera_angle} (eye-level|high-angle|low-angle|birds-eye|worms-eye|dutch-angle|over-the-shoulder|pov|oblique)
+Camera Distance: {camera_distance} (extreme-close-up|close-up|medium-close|medium|medium-long|long-shot|extreme-long)
+Subject Facing: {subject_facing}
 
 [SCENE/ENVIRONMENT - PRESERVE EXACTLY UNLESS EXPLICITLY CHANGED]
 Background: {initial_background}
@@ -179,7 +181,9 @@ Return a JSON object with these fields:
             visible_objects=character_data.get("visible_objects", "Not captured"),
             initial_pose=character_data.get("pose", "Not captured"),
             hand_position=character_data.get("hand_position", "Not captured"),
-            body_angle=character_data.get("body_angle", "Not captured"),
+            camera_angle=character_data.get("camera_angle", "eye-level"),
+            camera_distance=character_data.get("camera_distance", "medium"),
+            subject_facing=character_data.get("subject_facing", "camera"),
             initial_lighting=character_data.get("lighting", "Not captured"),
             color_palette=character_data.get("color_palette", "Not captured"),
             image_composition=character_data.get("image_composition", "Not captured"),

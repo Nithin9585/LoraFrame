@@ -192,7 +192,9 @@ async def generate_image(
             # Pose & Position
             "pose": char_meta.get("pose", ""),
             "hand_position": char_meta.get("hand_position", ""),
-            "body_angle": char_meta.get("body_angle", ""),
+            "camera_angle": char_meta.get("camera_angle", "eye-level"),
+            "camera_distance": char_meta.get("camera_distance", "medium"),
+            "subject_facing": char_meta.get("subject_facing", "camera"),
             # Background & Scene
             "initial_background": char_meta.get("initial_background", ""),
             "background_objects": char_meta.get("background_objects", ""),

@@ -161,7 +161,9 @@ class GeminiImageService:
                     # Pose & position
                     pose = character_data.get("pose", "")
                     hand_position = character_data.get("hand_position", "")
-                    body_angle = character_data.get("body_angle", "")
+                    camera_angle = character_data.get("camera_angle", "eye-level")
+                    camera_distance = character_data.get("camera_distance", "medium")
+                    subject_facing = character_data.get("subject_facing", "camera")
                     # Background & scene
                     initial_background = character_data.get("initial_background", "")
                     background_objects = character_data.get("background_objects", "")
@@ -190,11 +192,13 @@ class GeminiImageService:
                     if accessories and len(accessories) > 3: traits_list.append(f"ACCESSORIES: {accessories}")
                     if props_in_hands and len(props_in_hands) > 3: traits_list.append(f"HOLDING IN HANDS: {props_in_hands}")
                     
-                    # POSE & POSITION
-                    traits_list.append("\n=== POSE & POSITION (KEEP UNLESS CHANGED) ===")
+                    # POSE & CAMERA (STANDARDIZED)
+                    traits_list.append("\n=== POSE & CAMERA (KEEP UNLESS CHANGED) ===")
                     if pose and len(pose) > 3: traits_list.append(f"POSE: {pose}")
                     if hand_position and len(hand_position) > 3: traits_list.append(f"HAND POSITION: {hand_position}")
-                    if body_angle and len(body_angle) > 3: traits_list.append(f"BODY ANGLE/CAMERA: {body_angle}")
+                    traits_list.append(f"CAMERA ANGLE: {camera_angle}")
+                    traits_list.append(f"CAMERA DISTANCE: {camera_distance}")
+                    traits_list.append(f"SUBJECT FACING: {subject_facing}")
                     
                     # BACKGROUND & ALL OBJECTS
                     traits_list.append("\n=== BACKGROUND & OBJECTS (KEEP UNLESS NEW LOCATION) ===")
