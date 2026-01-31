@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import init_db
-from app.api import characters, generate, jobs, video
+from app.api import characters, generate, jobs, video, character_video
 
 
 @asynccontextmanager
@@ -46,6 +46,7 @@ app.add_middleware(
 app.include_router(characters.router, prefix="/api/v1/characters", tags=["Characters"])
 app.include_router(generate.router, prefix="/api/v1", tags=["Image Generation"])
 app.include_router(video.router, prefix="/api/v1", tags=["Video Generation"])
+app.include_router(character_video.router, prefix="/api/v1", tags=["Character Video"])
 app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["Jobs"])
 
 
