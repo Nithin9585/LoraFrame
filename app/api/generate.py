@@ -182,6 +182,9 @@ async def generate_image(
             "skin_tone": character.char_metadata.get("skin_tone", "") if character.char_metadata else "",
             "gender_presentation": character.char_metadata.get("gender_presentation", "") if character.char_metadata else "",
             "initial_outfit": character.char_metadata.get("initial_outfit", "") if character.char_metadata else "",
+            "initial_background": character.char_metadata.get("initial_background", "") if character.char_metadata else "",
+            "pose": character.char_metadata.get("pose", "") if character.char_metadata else "",
+            "lighting": character.char_metadata.get("lighting", "") if character.char_metadata else "",
             "accessories": character.char_metadata.get("accessories", "") if character.char_metadata else "",
             "eyebrows": character.char_metadata.get("eyebrows", "") if character.char_metadata else "",
             "semantic_vector": semantic_vector,  # Pass for identity verification

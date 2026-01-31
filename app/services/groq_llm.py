@@ -23,11 +23,14 @@ Age: {age_range}
 Build: {build}
 Character Tags: {semantic_tags}
 
-[INITIAL APPEARANCE - Character's canonical outfit]
+[INITIAL APPEARANCE - Character's canonical look (PRESERVE UNLESS EXPLICITLY CHANGED)]
 Original Outfit: {initial_outfit}
+Original Background/Setting: {initial_background}
+Original Pose: {initial_pose}
+Original Lighting: {initial_lighting}
 Accessories: {accessories}
 
-[CURRENT STATE - Override only if scene changes it]
+[CURRENT STATE - Override only if scene EXPLICITLY changes it]
 Currently wearing: {current_clothing}
 Current physical state: {current_state}
 Currently holding/has: {current_props}
@@ -49,13 +52,20 @@ Create a PRECISE image generation prompt that:
 [MANDATORY RULES - VIOLATION IS FAILURE]
 ❌ NEVER change: eye color, hair color, skin tone, facial structure, distinctive marks
 ❌ NEVER change: body type, height, age appearance
-❌ NEVER change: outfit UNLESS the scene explicitly says "wearing [new outfit]" or "changed into"
-✅ ALWAYS include: EXACT eye color (e.g., "dark brown eyes"), EXACT hair description, ALL distinctive marks
+❌ NEVER change: outfit UNLESS prompt explicitly says "wearing [X]" or "changed into [X]"
+❌ NEVER change: background/environment UNLESS prompt explicitly says "in [new location]" or "at [new place]"
+❌ NEVER change: pose UNLESS prompt explicitly requests a different pose
+❌ NEVER change: lighting UNLESS prompt explicitly requests different lighting
+✅ ALWAYS preserve the EXACT background from [INITIAL APPEARANCE] if no new location is specified
+✅ ALWAYS include: EXACT eye color, EXACT hair description, ALL distinctive marks
 ✅ ALWAYS start the prompt with detailed character description BEFORE the scene
-✅ Format: [Full character appearance with all details] + [Scene action/pose/setting] + [Lighting/mood/style]
+✅ Format: [Character] + [Same outfit unless changed] + [Same background unless changed] + [Same lighting unless changed]
 
 [OUTPUT FORMAT]
-A [gender] with [EXACT face description], [EXACT eye color and shape], [EXACT hair color/style/length], [EXACT skin tone], [ALL distinctive marks with locations]. Wearing [EXACT outfit description]. [Scene action]. [Environment]. Photorealistic, 8K, cinematic lighting, detailed skin texture.
+A [gender] with [EXACT face description], [EXACT eye color and shape], [EXACT hair color/style/length], [EXACT skin tone], [ALL distinctive marks with locations]. Wearing [SAME outfit from INITIAL APPEARANCE unless prompt specifies new clothing]. [Pose - same unless changed]. In [SAME background from INITIAL APPEARANCE unless prompt specifies new location]. [SAME lighting unless changed]. Photorealistic, 8K, detailed skin texture.
+
+CRITICAL: If the user prompt does NOT mention a new location/background, use the EXACT background from [INITIAL APPEARANCE].
+CRITICAL: If the user prompt does NOT mention new clothes, use the EXACT outfit from [INITIAL APPEARANCE].
 
 Generate ONLY the final prompt - no explanations:"""
 
@@ -155,6 +165,9 @@ Return a JSON object with these fields:
             build=character_data.get("build", "Average"),
             semantic_tags=", ".join(character_data.get("tags", [])) or "None specified",
             initial_outfit=character_data.get("initial_outfit", "Not captured"),
+            initial_background=character_data.get("initial_background", "Not captured"),
+            initial_pose=character_data.get("pose", "Not captured"),
+            initial_lighting=character_data.get("lighting", "Not captured"),
             accessories=character_data.get("accessories", "None"),
             current_clothing=", ".join(current_clothing) if current_clothing else "Not established yet - use initial outfit",
             current_state=", ".join(current_state) if current_state else "Normal, healthy",

@@ -151,7 +151,10 @@ async def extract_visual_traits(
         "skin_tone": "Not specified",
         "gender_presentation": "Not specified",
         "initial_outfit": "Not captured",
+        "initial_background": "Not captured",
         "accessories": "None",
+        "pose": "Not captured",
+        "lighting": "Not captured",
         "tags": []
     }
     
@@ -183,12 +186,16 @@ Extract the following details in JSON format:
     "skin_tone": "Specific skin complexion (e.g., 'fair/porcelain', 'light olive', 'medium tan', 'deep brown', 'dark ebony')",
     "gender_presentation": "How the person presents (masculine, feminine, androgynous)",
     "initial_outfit": "EXACT description of what they are wearing in this image (colors, style, fabric type if visible)",
+    "initial_background": "EXACT description of the background/environment/setting in this image (indoor/outdoor, colors, objects, location type, atmosphere)",
     "accessories": "Any accessories visible (jewelry, glasses, watch, etc.)",
+    "pose": "Description of the person's pose/position (standing, sitting, angle, hand position)",
+    "lighting": "Description of the lighting (natural, studio, warm, cool, direction, shadows)",
     "tags": ["list", "of", "10-15", "descriptive", "tags", "including", "style", "vibe", "aesthetic"]
 }
 
 Be EXTREMELY specific and precise - this data will be used to recreate this EXACT person in AI-generated images.
 Include EVERY visible detail. Colors must be exact (not just 'brown' but 'warm chestnut brown').
+The background/environment description is CRITICAL - it must be preserved unless explicitly changed.
 Return ONLY the JSON object, no additional text."""
         
         # Load the image and analyze it

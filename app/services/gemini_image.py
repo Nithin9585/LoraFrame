@@ -153,6 +153,9 @@ class GeminiImageService:
                     build = character_data.get("build", "")
                     skin_tone = character_data.get("skin_tone", "")
                     initial_outfit = character_data.get("initial_outfit", "")
+                    initial_background = character_data.get("initial_background", "")
+                    pose = character_data.get("pose", "")
+                    lighting = character_data.get("lighting", "")
                     accessories = character_data.get("accessories", "")
                     tags = character_data.get("tags", [])
                     
@@ -166,8 +169,12 @@ class GeminiImageService:
                     if build and len(build) > 3: traits_list.append(f"BUILD: {build}")
                     if distinctives and len(distinctives) > 3: traits_list.append(f"DISTINCTIVE MARKS: {distinctives}")
                     # OUTFIT - Use initial if no scene change
-                    if initial_outfit and len(initial_outfit) > 3: traits_list.append(f"OUTFIT: {initial_outfit}")
+                    if initial_outfit and len(initial_outfit) > 3: traits_list.append(f"OUTFIT (KEEP SAME): {initial_outfit}")
                     if accessories and len(accessories) > 3: traits_list.append(f"ACCESSORIES: {accessories}")
+                    # BACKGROUND - CRITICAL: Preserve unless explicitly changed
+                    if initial_background and len(initial_background) > 3: traits_list.append(f"BACKGROUND (KEEP SAME): {initial_background}")
+                    if pose and len(pose) > 3: traits_list.append(f"POSE: {pose}")
+                    if lighting and len(lighting) > 3: traits_list.append(f"LIGHTING (KEEP SAME): {lighting}")
                     if tags: traits_list.append(f"Style: {', '.join(tags[:5])}")
                     
                     if traits_list:
@@ -179,22 +186,25 @@ class GeminiImageService:
                         print(f"[Gemini] Using semantic vector for identity preservation (embedding shape: {semantic_vector.shape})")
 
                 # Enhanced prompt that tells Gemini to use the reference for identity + explicit traits
-                identity_prompt = f"""REFERENCE-BASED CHARACTER GENERATION
+                identity_prompt = f"""REFERENCE-BASED CHARACTER GENERATION - PRESERVE EVERYTHING
 
 You MUST generate an image of the EXACT SAME PERSON shown in the reference image.
 
-[MANDATORY CHARACTER IDENTITY - DO NOT CHANGE]
+[MANDATORY - PRESERVE FROM REFERENCE IMAGE]
 {traits_prompt}{identity_confidence}
 
 [SCENE REQUEST]
 {prompt}
 
-[GENERATION RULES]
-1. The person in the generated image MUST have IDENTICAL features to the reference
-2. Same face shape, eye color, hair color, skin tone, body build
-3. Keep the same outfit unless the scene explicitly changes it
-4. Copy ALL distinctive marks (scars, moles, tattoos) to their exact locations
-5. Generate the scene while maintaining 100% character identity"""
+[CRITICAL GENERATION RULES]
+1. The person MUST have IDENTICAL features to the reference (face, eyes, hair, skin)
+2. Keep the EXACT SAME outfit unless the prompt explicitly says "wearing [new clothes]"
+3. Keep the EXACT SAME background/environment unless the prompt explicitly says "in [new location]" or "at [new place]"
+4. Keep the EXACT SAME lighting unless the prompt explicitly changes it
+5. Copy ALL distinctive marks (scars, moles, tattoos) to their exact locations
+
+⚠️ IF THE PROMPT DOES NOT MENTION A NEW LOCATION, KEEP THE ORIGINAL BACKGROUND!
+⚠️ IF THE PROMPT DOES NOT MENTION NEW CLOTHES, KEEP THE ORIGINAL OUTFIT!"""
                 contents.append(identity_prompt)
             else:
                 # No reference image, just use the prompt

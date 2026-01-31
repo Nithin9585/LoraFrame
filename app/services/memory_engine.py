@@ -42,6 +42,9 @@ class CharacterSheet:
     age_range: str
     build: str
     initial_outfit: str
+    initial_background: str
+    pose: str
+    lighting: str
     accessories: str
     semantic_tags: List[str]
     
@@ -57,6 +60,9 @@ Distinctives: {self.distinctive_marks}
 Age: {self.age_range}
 Build: {self.build}
 Initial Outfit: {self.initial_outfit}
+Initial Background: {self.initial_background}
+Pose: {self.pose}
+Lighting: {self.lighting}
 Accessories: {self.accessories}
 Tags: {', '.join(self.semantic_tags)}"""
 
@@ -134,6 +140,9 @@ class CharacterMemoryEngine:
             age_range=metadata.get("age_range", "Unknown"),
             build=metadata.get("build", "Average"),
             initial_outfit=metadata.get("initial_outfit", "Not captured"),
+            initial_background=metadata.get("initial_background", "Not captured"),
+            pose=metadata.get("pose", "Not captured"),
+            lighting=metadata.get("lighting", "Not captured"),
             accessories=metadata.get("accessories", "None"),
             semantic_tags=metadata.get("tags", [])
         )
