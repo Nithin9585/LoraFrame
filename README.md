@@ -18,29 +18,30 @@ LORAFRAME is an advanced AI pipeline designed to generate consistent, evolving d
 
 ```mermaid
 graph TD
+
   subgraph Client
-    UI[Web UI / Mobile / Integration]
+    UI["Web UI / Mobile / Integration"]
   end
 
   subgraph API_Layer
-    API[FastAPI Backend]
+    API["FastAPI Backend"]
   end
 
   subgraph Logic_Core
-    Orch[Orchestrator]
-    MemEng[Memory Engine]
-    PromptEng[Groq Prompt Engine]
+    Orch["Orchestrator"]
+    MemEng["Memory Engine"]
+    PromptEng["Groq Prompt Engine"]
   end
 
   subgraph Data_Layer
-    PG[(Postgres: Metadata)]
-    VDB[(Vector DB: Pinecone/Milvus)]
-    S3[(Object Storage)]
+    PG["Postgres: Metadata"]
+    VDB["Vector DB: Pinecone/Milvus"]
+    S3["Object Storage"]
   end
 
   subgraph GenAI_Services
-    Gemini[Google Gemini / Imagen]
-    Veo[Google Veo (Video)]
+    Gemini["Google Gemini / Imagen"]
+    Veo["Google Veo - Video"]
   end
 
   UI --> API
@@ -53,6 +54,7 @@ graph TD
   PromptEng --> Veo
   Gemini --> S3
   Veo --> S3
+
 ```
 
 ---
