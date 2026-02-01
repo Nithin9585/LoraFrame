@@ -35,12 +35,12 @@ graph TD
 
   subgraph Data_Layer
     PG["Postgres: Metadata"]
-    VDB["Vector DB: Pinecone/Milvus"]
+    VDB["Vector DB: Pinecone"]
     S3["Object Storage"]
   end
 
   subgraph GenAI_Services
-    Gemini["Google Gemini / Imagen"]
+    Gemini["Google Gemini "]
     Veo["Google Veo - Video"]
   end
 
